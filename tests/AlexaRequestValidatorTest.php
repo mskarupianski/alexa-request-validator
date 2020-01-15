@@ -1,4 +1,5 @@
 <?php
+
 use Humps\AlexaRequest\AlexaRequestValidator;
 use Humps\AlexaRequest\Exceptions\AlexaValidationException;
 use PHPUnit\Framework\TestCase;
@@ -14,7 +15,7 @@ class AlexaRequestValidatorTest extends TestCase
      */
     public function it_returns_true_when_the_application_ids_do_match()
     {
-        $request = ['session' => ['application' => ['applicationId' => 'foo']]];
+        $request = ['context' => ['System' => ['application' => ['applicationId' => 'foo']]]];
         $validator = new AlexaRequestValidator('foo', json_encode($request), 'https://s3.amazonaws.com/echo.api/echo-api-cert.pem', 'foo');
         $this->assertTrue($validator->isValidApplicationId());
     }
@@ -26,7 +27,7 @@ class AlexaRequestValidatorTest extends TestCase
     {
         $this->expectException(AlexaValidationException::class);
         //session->application->applicationId
-        $request = ['session' => ['application' => ['applicationId' => 'bar']]];
+        $request = ['context' => ['System' => ['application' => ['applicationId' => 'bar']]]];
         $validator = new AlexaRequestValidator('foo', json_encode($request), 'https://s3.amazonaws.com/echo.api/echo-api-cert.pem', 'foo');
         $validator->isValidApplicationId();
     }
@@ -47,7 +48,7 @@ class AlexaRequestValidatorTest extends TestCase
      */
     public function it_returns_true_when_the_request_in_inside_the_timestamp_tolerance()
     {
-        $date = date('Y-m-d\TH:i:s\Z') - 110;
+        $date = (int)date('Y-m-d\TH:i:s\Z') - 110;
         $request = ['request' => ['timestamp' => $date]];
         $validator = new AlexaRequestValidator('foo', json_encode($request), 'https://s3.amazonaws.com/echo.api/echo-api-cert.pem', 'foo');
         $this->assertTrue($validator->requestHasNotTimedOut());
@@ -59,7 +60,7 @@ class AlexaRequestValidatorTest extends TestCase
     public function it_throws_an_exception_when_the_request_has_timed_out()
     {
         // Check the maximum amount of time allowed by amazon, by default this is set to 120 seconds so anything after that should fail
-        $date = date('Y-m-d\TH:i:s\Z') - 150;
+        $date = (int)date('Y-m-d\TH:i:s\Z') - 150;
         $request = ['request' => ['timestamp' => $date]];
         $this->expectException(AlexaValidationException::class);
         $validator = new AlexaRequestValidator('foo', json_encode($request), 'https://s3.amazonaws.com/echo.api/echo-api-cert.pem', 'foo');
@@ -205,10 +206,16 @@ class AlexaRequestValidatorTest extends TestCase
      */
     public function it_returns_true_when_the_certificate_has_not_expired()
     {
-        $validator = new AlexaRequestValidator('foo', 'foo', self::VALID_PEM_URL, 'foo');
-        $pem = $validator->getPem();
-        $cert = $validator->getCertificate($pem);
-        $this->assertTrue($validator->certificateHasNotExpired($cert));
+        try {
+            $validator = new AlexaRequestValidator('foo', 'foo', self::VALID_PEM_URL, 'foo');
+            $pem = $validator->getPem();
+            $cert = $validator->getCertificate($pem);
+            $this->assertTrue($validator->certificateHasNotExpired($cert));
+        } catch (AlexaValidationException $e) {
+            $this->markTestIncomplete(
+                'Pem expired: please update VALID_PEM_URL in AlexaRequestValidatorTest to run test'
+            );
+        }
     }
 
     /**
